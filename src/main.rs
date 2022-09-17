@@ -1,9 +1,20 @@
+use clap::Parser;
+
+mod account;
 mod ledger;
-mod tests;
+mod transaction;
+
+#[derive(Parser, Debug)]
+#[clap(author, version, about, long_about = None)]
+struct Args {
+    #[clap(index = 1)]
+    csv_filename: String,
+}
 
 fn main() {
-    let args = &std::env::args().collect::<Vec<String>>()[1];
-    let file = std::fs::File::open(args).expect("Failed to read input file.");
+    let args = Args::parse();
+    let filename = args.csv_filename;
+    let file = std::fs::File::open(filename).expect("Failed to read input file.");
 
     let mut rdr = csv::ReaderBuilder::new()
         .trim(csv::Trim::All) // example file contains space padding
@@ -14,11 +25,12 @@ fn main() {
         std::collections::HashMap::new(),
     );
 
-    for transaction in rdr.deserialize::<crate::ledger::Transaction>() {
-        transaction
+    for transaction in rdr.deserialize::<crate::transaction::Transaction>() {
+        // We don't care about the errors here.
+        let _ = transaction
             .expect("Failed to parse transaction.")
             .append_to(&mut ledger)
-            .expect("Failed to apply transaction.");
+            .expect("Failed to parse transaction.");
     }
 
     let mut wtr = csv::WriterBuilder::new().from_writer(std::io::stdout());

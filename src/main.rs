@@ -29,8 +29,7 @@ fn main() {
         // We don't care about the errors here.
         let _ = transaction
             .expect("Failed to parse transaction.")
-            .append_to(&mut ledger)
-            .expect("Failed to parse transaction.");
+            .append_to(&mut ledger);
     }
 
     let mut wtr = csv::WriterBuilder::new().from_writer(std::io::stdout());

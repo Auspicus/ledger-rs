@@ -4,7 +4,7 @@ use serde::Deserialize;
 
 use crate::{account::Account, ledger::Ledger};
 
-#[derive(Debug, Deserialize, Clone, Copy)]
+#[derive(Debug, Deserialize, Clone, Copy, PartialEq)]
 #[serde(rename_all = "lowercase")]
 #[non_exhaustive]
 pub enum TransactionType {
@@ -131,7 +131,7 @@ impl Display for TransactionError {
 }
 
 // 16 bytes
-#[derive(Debug, Deserialize, Clone, Copy)]
+#[derive(Debug, Deserialize, Clone, Copy, PartialEq)]
 pub struct Transaction {
     /// Type of transaction. See `TransactionType` for more information.
     #[serde(rename = "type")]

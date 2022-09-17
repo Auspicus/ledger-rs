@@ -160,4 +160,28 @@ resolve,1,1,
             }]));
         }
     }
+
+    /// If an account is locked and then a dispute is made against a
+    /// transaction it has made the transaction should not be marked
+    /// as disputed.
+    #[test]
+    fn prevent_transactions_from_being_stuck_in_disputed() {
+        if let Ok(ledger) = create_test_ledger(
+            "\
+type,client,tx,amount
+deposit,1,1,100
+withdrawal,1,2,50
+dispute,1,2,
+chargeback,1,2,
+",
+        ) { 
+            assert_eq!(ledger.transactions.get(&2).unwrap(), &crate::transaction::Transaction {
+                tx_id: 2,
+                tx_type: crate::transaction::TransactionType::Withdrawal,
+                amount: Some(50.0),
+                client_id: 1,
+                disputed: false,
+            });
+        }
+    }
 }

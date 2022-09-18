@@ -171,11 +171,7 @@ impl Transaction {
         }
     }
 
-    fn get_amount(&self) -> Result<f64, TransactionError> {
-        self.amount.ok_or(TransactionError::Malformed)
-    }
-
-    fn get_account<'a>(&self, ledger: &'a mut Ledger) -> Result<&'a mut Account, TransactionError> {
+    fn get_account_and_referenced_tx<'a>(&self, ledger: &'a mut Ledger) -> Result<(&'a mut Account, &'a mut Transaction), TransactionError> {
         let account = ledger
             .accounts
             .entry(self.client_id)
@@ -185,13 +181,6 @@ impl Transaction {
             return Err(TransactionError::AccountLocked);
         }
 
-        Ok(account)
-    }
-
-    fn get_referenced_transaction<'a>(
-        &self,
-        ledger: &'a mut Ledger,
-    ) -> Result<&'a mut Self, TransactionError> {
         if !ledger.transactions.contains_key(&self.tx_id) {
             return Err(TransactionError::TransactionNotFound);
         }
@@ -216,7 +205,24 @@ impl Transaction {
             }
         }
 
-        Ok(referenced_tx)
+        Ok((account, referenced_tx))
+    }
+
+    fn get_amount(&self) -> Result<f64, TransactionError> {
+        self.amount.ok_or(TransactionError::Malformed)
+    }
+
+    fn get_account<'a>(&self, ledger: &'a mut Ledger) -> Result<&'a mut Account, TransactionError> {
+        let account = ledger
+            .accounts
+            .entry(self.client_id)
+            .or_insert_with(|| Account::new(self.client_id));
+
+        if account.is_locked {
+            return Err(TransactionError::AccountLocked);
+        }
+
+        Ok(account)
     }
 
     /// Appends a transaction to the ledger.
@@ -243,32 +249,31 @@ impl Transaction {
                 account.total_funds = account.available_funds + account.held_funds;
             }
             TransactionType::Dispute => {
-                let referenced_tx = self.get_referenced_transaction(ledger)?.is_not_disputed()?;
+                let (account, referenced_tx) = self.get_account_and_referenced_tx(ledger)?;
                 let amount = referenced_tx.get_amount()?;
+                let referenced_tx = referenced_tx.is_not_disputed()?;
 
                 referenced_tx.disputed = true;
-
-                let account = self.get_account(ledger)?;
                 account.available_funds -= amount;
                 account.held_funds += amount;
                 account.total_funds = account.available_funds + account.held_funds;
             }
             TransactionType::Resolve => {
-                let referenced_tx = self.get_referenced_transaction(ledger)?.is_disputed()?;
-                let amount = referenced_tx.amount.ok_or(TransactionError::Malformed)?;
+                let (account, referenced_tx) = self.get_account_and_referenced_tx(ledger)?;
+                let amount = referenced_tx.get_amount()?;
+                let referenced_tx = referenced_tx.is_disputed()?;
 
                 referenced_tx.disputed = false;
-
-                let account = self.get_account(ledger)?;
                 account.available_funds += amount;
                 account.held_funds -= amount;
                 account.total_funds = account.available_funds + account.held_funds;
             }
             TransactionType::Chargeback => {
-                let referenced_tx = self.get_referenced_transaction(ledger)?.is_disputed()?;
+                let (account, referenced_tx) = self.get_account_and_referenced_tx(ledger)?;
                 let amount = referenced_tx.get_amount()?;
-                let account = self.get_account(ledger)?;
+                let referenced_tx = referenced_tx.is_disputed()?;
 
+                referenced_tx.disputed = false;
                 account.is_locked = true;
                 account.held_funds -= amount;
                 account.total_funds = account.available_funds + account.held_funds;

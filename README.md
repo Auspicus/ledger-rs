@@ -2,7 +2,7 @@
 
 - For authorization purposes, does the client ID of a dispute and a transaction need to match?
 - Can a client dispute a chargeback? This would require a deep traversal of the transaction history.
-- Concurrency? Could this be handled in a multi-threaded web-app? With access to a shared database 
+- Concurrency? Could this be handled in a multi-threaded web-app? With access to a shared database?
 
 # Dependencies
 

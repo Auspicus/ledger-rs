@@ -181,10 +181,6 @@ impl Transaction {
             return Err(TransactionError::AccountLocked);
         }
 
-        if !ledger.transactions.contains_key(&self.tx_id) {
-            return Err(TransactionError::TransactionNotFound);
-        }
-
         let referenced_tx = ledger
             .transactions
             .get_mut(&self.tx_id)

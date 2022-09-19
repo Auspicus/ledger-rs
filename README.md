@@ -9,17 +9,21 @@
 
 Based on how an ATM works, if I dispute a withdrawal (fraudulent use of card for instance) then I should be reimbursed the total value of the withdrawal upon resolution. Something like this:
 
+```
 deposit 100 : total = 100
 withdraw 90 : total = 10
 dispute ^   : total = 10,  held = 90, available = 10
 resolve ^   : total = 100, held = 00, available = 100
+```
 
 Based on the way this has been described in documentation, the above transactions would rather look something like:
 
+```
 deposit 100 : total = 100
 withdraw 90 : total = 10
 dispute ^   : total = 10,  held = 90, available = -80
 resolve ^   : total = 10,  held = 00, available = 10
+```
 
 I have gone with my intuition here and instead based the logic around how I believe an ATM withdrawal should be disputed and resolved.
 

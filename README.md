@@ -72,7 +72,7 @@ I have gone with my intuition here and instead based the logic around how I beli
     - 128 gigabyte working set should cope
     - assuming ~4 billion transactions, ~1 billion accounts
   - This working set requirement can be almost entirely eliminated using a database but will slow down transaction processing. LRU cache (Redis?) could be a consideration to balance fast in-memory lookups with slower database transactions.
-- To better describe invariance in the program it would be good to parse each transaction as it's own data type with associated fields. I couldn't figure out how to quickly do this with `serde` though I'm sure there's a way. Basically, `Transaction` should become `Dispute(associated_data)`. This would mean that we no longer need `Dispute.amount = None` and `Deposit.amount = Some(4)`. Rather no `Dispute` would ever contain an `amount` and all `Deposit` will always contain an `amount`. This is more accurate to the expected invariance.
+- To better describe invariance in the program it would be good to parse each transaction as it's own data type with associated fields. I couldn't figure out how to quickly do this with `serde` though I'm sure there's a way. Basically, `Transaction` should become `Dispute(associated_data)`. This would mean that we no longer need `Dispute.amount = None` and `Deposit.amount = Some(4)`. Rather no `Dispute` would ever contain an `amount` and all `Deposit` will always contain an `amount`. This is more accurate to the expected invariance and makes better use of the detailed Rust type system.
 
 
 # Profiling on MacOS using Instruments.app

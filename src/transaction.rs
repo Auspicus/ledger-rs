@@ -98,6 +98,9 @@ pub enum TransactionError {
     /// Transaction contains invalid data.
     Malformed,
 
+    /// Two transactions with the same ID have been processed.
+    DuplicateTransactionID,
+
     /// Transaction could not be processed due to the client having insufficient funds.
     InsufficientFunds,
 
@@ -171,7 +174,10 @@ impl Transaction {
         }
     }
 
-    fn get_account_and_referenced_tx<'a>(&self, ledger: &'a mut Ledger) -> Result<(&'a mut Account, &'a mut Transaction), TransactionError> {
+    fn get_account_and_referenced_tx<'a>(
+        &self,
+        ledger: &'a mut Ledger,
+    ) -> Result<(&'a mut Account, &'a mut Transaction), TransactionError> {
         let account = ledger
             .accounts
             .entry(self.client_id)
@@ -226,6 +232,26 @@ impl Transaction {
     /// Creates accounts where necessary.
     pub fn append_to(&self, ledger: &mut Ledger) -> Result<(), TransactionError> {
         match self.tx_type {
+            TransactionType::Deposit | TransactionType::Withdrawal => {
+                // Keep track of this transaction in case there are disputes.
+                // Since we only track deposits and withdrawals we don't need
+                // to check the type of transaction that is disputed since
+                // we will only find those transaction types from a lookup.
+                if let Some(old) = ledger.transactions.insert(self.tx_id, *self) {
+                    // `try_insert` could be used here but
+                    // isn't available in stable Rust.
+                    // Put back the old record.
+                    ledger.transactions.insert(self.tx_id, old);
+                    
+                    // Don't process the duplicate transaction,
+                    // instead bail with an error.
+                    return Err(TransactionError::DuplicateTransactionID);
+                }
+            }
+            _ => {}
+        }
+
+        match self.tx_type {
             TransactionType::Deposit => {
                 let amount = self.get_amount()?;
                 let account = self.get_account(ledger)?;
@@ -250,7 +276,11 @@ impl Transaction {
                 let referenced_tx = referenced_tx.is_not_disputed()?;
 
                 referenced_tx.disputed = true;
-                account.available_funds -= amount;
+
+                if referenced_tx.tx_type == TransactionType::Deposit {
+                    account.available_funds -= amount;
+                }
+
                 account.held_funds += amount;
                 account.total_funds = account.available_funds + account.held_funds;
             }
@@ -274,17 +304,6 @@ impl Transaction {
                 account.held_funds -= amount;
                 account.total_funds = account.available_funds + account.held_funds;
             }
-        }
-
-        match self.tx_type {
-            TransactionType::Deposit | TransactionType::Withdrawal => {
-                // Keep track of this transaction in case there are disputes.
-                // Since we only track deposits and withdrawals we don't need
-                // to check the type of transaction that is disputed since
-                // we will only find those transaction types from a lookup.
-                ledger.transactions.insert(self.tx_id, *self);
-            }
-            _ => {}
         }
 
         Ok(())

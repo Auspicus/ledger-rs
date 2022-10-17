@@ -49,7 +49,7 @@ mod tests {
 
     use crate::account::Account;
     use crate::ledger::Ledger;
-    use crate::transaction::{TransactionError, Transaction, TransactionType};
+    use crate::transaction::{Transaction, TransactionError, TransactionType};
 
     fn create_test_ledger(contents: &str) -> Result<Ledger, TransactionError> {
         let mut rdr = csv::ReaderBuilder::new()
@@ -79,21 +79,27 @@ withdrawal,2,6,5
         )
         .unwrap();
 
-        assert_eq!(ledger.accounts.get(&1).unwrap(), &Account {
-            client_id: 1,
-            available_funds: 3.0,
-            held_funds: 0.0,
-            total_funds: 3.0,
-            is_locked: false,
-        });
+        assert_eq!(
+            ledger.accounts.get(&1).unwrap(),
+            &Account {
+                client_id: 1,
+                available_funds: 3.0,
+                held_funds: 0.0,
+                total_funds: 3.0,
+                is_locked: false,
+            }
+        );
 
-        assert_eq!(ledger.accounts.get(&2).unwrap(), &Account {
-            client_id: 2,
-            available_funds: 4.0,
-            held_funds: 0.0,
-            total_funds: 4.0,
-            is_locked: false,
-        });
+        assert_eq!(
+            ledger.accounts.get(&2).unwrap(),
+            &Account {
+                client_id: 2,
+                available_funds: 4.0,
+                held_funds: 0.0,
+                total_funds: 4.0,
+                is_locked: false,
+            }
+        );
     }
 
     #[test]
@@ -306,13 +312,16 @@ dispute,1,2
         )
         .unwrap();
 
-        assert_eq!(ledger.accounts.get(&1).unwrap(), &Account {
-            client_id: 1,
-            available_funds: 10.0,
-            held_funds: 90.0,
-            total_funds: 100.0,
-            is_locked: false,
-        });
+        assert_eq!(
+            ledger.accounts.get(&1).unwrap(),
+            &Account {
+                client_id: 1,
+                available_funds: 10.0,
+                held_funds: 90.0,
+                total_funds: 100.0,
+                is_locked: false,
+            }
+        );
     }
 
     #[test]
@@ -328,15 +337,17 @@ resolve,1,2
         )
         .unwrap();
 
-        assert_eq!(ledger.accounts.get(&1).unwrap(), &Account {
-            client_id: 1,
-            available_funds: 100.0,
-            held_funds: 0.0,
-            total_funds: 100.0,
-            is_locked: false,
-        });
+        assert_eq!(
+            ledger.accounts.get(&1).unwrap(),
+            &Account {
+                client_id: 1,
+                available_funds: 100.0,
+                held_funds: 0.0,
+                total_funds: 100.0,
+                is_locked: false,
+            }
+        );
     }
-
 
     #[test]
     fn chargeback_on_a_disputed_withdrawal_removes_held_funds() {
@@ -351,13 +362,16 @@ chargeback,1,2
         )
         .unwrap();
 
-        assert_eq!(ledger.accounts.get(&1).unwrap(), &Account {
-            client_id: 1,
-            available_funds: 10.0,
-            held_funds: 0.0,
-            total_funds: 10.0,
-            is_locked: true,
-        });
+        assert_eq!(
+            ledger.accounts.get(&1).unwrap(),
+            &Account {
+                client_id: 1,
+                available_funds: 10.0,
+                held_funds: 0.0,
+                total_funds: 10.0,
+                is_locked: true,
+            }
+        );
     }
 
     #[test]
@@ -376,18 +390,23 @@ deposit,1,1,100
             client_id: 1,
             amount: Some(90.0),
             disputed: false,
-        }.append_to(&mut ledger).unwrap_err();
+        }
+        .append_to(&mut ledger)
+        .unwrap_err();
 
         // Rejects adding new transaction.
         assert_eq!(err, TransactionError::DuplicateTransactionID);
-        
+
         // Maintains original transaction.
-        assert_eq!(ledger.transactions.get(&1).unwrap(), &Transaction {
-            tx_type: TransactionType::Deposit,
-            tx_id: 1,
-            client_id: 1,
-            amount: Some(100.0),
-            disputed: false,
-        });
+        assert_eq!(
+            ledger.transactions.get(&1).unwrap(),
+            &Transaction {
+                tx_type: TransactionType::Deposit,
+                tx_id: 1,
+                client_id: 1,
+                amount: Some(100.0),
+                disputed: false,
+            }
+        );
     }
 }

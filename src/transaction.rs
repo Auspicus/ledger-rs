@@ -1,4 +1,4 @@
-use std::{error::Error, fmt::Display};
+use std::{collections::HashMap, error::Error, fmt::Display};
 
 use serde::Deserialize;
 
@@ -158,28 +158,31 @@ pub struct Transaction {
 }
 
 impl Transaction {
-    fn is_disputed(&mut self) -> Result<&mut Self, TransactionError> {
+    fn is_disputed(&mut self) -> Result<(), TransactionError> {
         if !self.disputed {
             Err(TransactionError::NotDisputed)
         } else {
-            Ok(self)
+            Ok(())
         }
     }
 
-    fn is_not_disputed(&mut self) -> Result<&mut Self, TransactionError> {
+    fn is_not_disputed(&mut self) -> Result<(), TransactionError> {
         if self.disputed {
             Err(TransactionError::AlreadyDisputed)
         } else {
-            Ok(self)
+            Ok(())
         }
     }
 
-    fn get_account_and_referenced_tx<'a>(
+    fn get_amount(&self) -> Result<f64, TransactionError> {
+        self.amount.ok_or(TransactionError::Malformed)
+    }
+
+    fn get_account<'a>(
         &self,
-        ledger: &'a mut Ledger,
-    ) -> Result<(&'a mut Account, &'a mut Transaction), TransactionError> {
-        let account = ledger
-            .accounts
+        accounts: &'a mut HashMap<u16, Account>,
+    ) -> Result<&'a mut Account, TransactionError> {
+        let account = accounts
             .entry(self.client_id)
             .or_insert_with(|| Account::new(self.client_id));
 
@@ -187,8 +190,14 @@ impl Transaction {
             return Err(TransactionError::AccountLocked);
         }
 
-        let referenced_tx = ledger
-            .transactions
+        Ok(account)
+    }
+
+    fn get_referenced_tx<'a>(
+        &self,
+        transactions: &'a mut HashMap<u32, Transaction>,
+    ) -> Result<&'a mut Transaction, TransactionError> {
+        let referenced_tx = transactions
             .get_mut(&self.tx_id)
             .ok_or(TransactionError::TransactionNotFound)?;
 
@@ -207,24 +216,7 @@ impl Transaction {
             }
         }
 
-        Ok((account, referenced_tx))
-    }
-
-    fn get_amount(&self) -> Result<f64, TransactionError> {
-        self.amount.ok_or(TransactionError::Malformed)
-    }
-
-    fn get_account<'a>(&self, ledger: &'a mut Ledger) -> Result<&'a mut Account, TransactionError> {
-        let account = ledger
-            .accounts
-            .entry(self.client_id)
-            .or_insert_with(|| Account::new(self.client_id));
-
-        if account.is_locked {
-            return Err(TransactionError::AccountLocked);
-        }
-
-        Ok(account)
+        Ok(referenced_tx)
     }
 
     /// Appends a transaction to the ledger.
@@ -242,7 +234,7 @@ impl Transaction {
                     // isn't available in stable Rust.
                     // Put back the old record.
                     ledger.transactions.insert(self.tx_id, old);
-                    
+
                     // Don't process the duplicate transaction,
                     // instead bail with an error.
                     return Err(TransactionError::DuplicateTransactionID);
@@ -254,14 +246,14 @@ impl Transaction {
         match self.tx_type {
             TransactionType::Deposit => {
                 let amount = self.get_amount()?;
-                let account = self.get_account(ledger)?;
+                let account = self.get_account(&mut ledger.accounts)?;
 
                 account.available_funds += amount;
                 account.total_funds = account.available_funds + account.held_funds;
             }
             TransactionType::Withdrawal => {
                 let amount = self.get_amount()?;
-                let account = self.get_account(ledger)?;
+                let account = self.get_account(&mut ledger.accounts)?;
 
                 if amount > account.available_funds {
                     return Err(TransactionError::InsufficientFunds);
@@ -271,9 +263,10 @@ impl Transaction {
                 account.total_funds = account.available_funds + account.held_funds;
             }
             TransactionType::Dispute => {
-                let (account, referenced_tx) = self.get_account_and_referenced_tx(ledger)?;
+                let account = self.get_account(&mut ledger.accounts)?;
+                let referenced_tx = self.get_referenced_tx(&mut ledger.transactions)?;
                 let amount = referenced_tx.get_amount()?;
-                let referenced_tx = referenced_tx.is_not_disputed()?;
+                referenced_tx.is_not_disputed()?;
 
                 referenced_tx.disputed = true;
 
@@ -285,9 +278,10 @@ impl Transaction {
                 account.total_funds = account.available_funds + account.held_funds;
             }
             TransactionType::Resolve => {
-                let (account, referenced_tx) = self.get_account_and_referenced_tx(ledger)?;
+                let account = self.get_account(&mut ledger.accounts)?;
+                let referenced_tx = self.get_referenced_tx(&mut ledger.transactions)?;
                 let amount = referenced_tx.get_amount()?;
-                let referenced_tx = referenced_tx.is_disputed()?;
+                referenced_tx.is_disputed()?;
 
                 referenced_tx.disputed = false;
                 account.available_funds += amount;
@@ -295,9 +289,10 @@ impl Transaction {
                 account.total_funds = account.available_funds + account.held_funds;
             }
             TransactionType::Chargeback => {
-                let (account, referenced_tx) = self.get_account_and_referenced_tx(ledger)?;
+                let account = self.get_account(&mut ledger.accounts)?;
+                let referenced_tx = self.get_referenced_tx(&mut ledger.transactions)?;
                 let amount = referenced_tx.get_amount()?;
-                let referenced_tx = referenced_tx.is_disputed()?;
+                referenced_tx.is_disputed()?;
 
                 referenced_tx.disputed = false;
                 account.is_locked = true;
